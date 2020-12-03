@@ -1,0 +1,13 @@
+Dostawca[0] - Odbiorca[0]: 16
+Dostawca[0] - Odbiorca[1]: 4
+Dostawca[0] - Odbiorca[2]: 0
+Dostawca[0] - Odbiorca[3]: 0
+Dostawca[1] - Odbiorca[0]: 0
+Dostawca[1] - Odbiorca[1]: 8
+Dostawca[1] - Odbiorca[2]: 24
+Dostawca[1] - Odbiorca[3]: 8
+Dostawca[2] - Odbiorca[0]: 0
+Dostawca[2] - Odbiorca[1]: 0
+Dostawca[2] - Odbiorca[2]: 0
+Dostawca[2] - Odbiorca[3]: 52
+Zysk = 176

@@ -1,3 +1,8 @@
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -7,7 +12,7 @@ import org.chocosolver.solver.Solver;
 import org.chocosolver.solver.variables.IntVar;
 
 public class Main {
-  public static void main(String[] args) {
+  public static void main(String[] args) throws IOException {
     Model model = new Model("Zagadnienie pośrednika");
     List<Participant> receivers = new ArrayList<>();
     List<Participant> deliverers = new ArrayList<>();
@@ -110,10 +115,34 @@ public class Main {
     Solver solver = model.getSolver();
     Solution solution = solver.findOptimalSolution(goalFunction, true);
     //    WRITE SOLUTION TO FILE
-    System.out.println(solution.toString());
+    writeSolutionToFile(
+        solution, numberOfDeliverers, numberOfReceivers, routesTransports, goalFunction);
   }
 
   private static int getSumOfValues(List<Participant> participants) {
     return participants.stream().mapToInt(Participant::getValue).sum();
+  }
+
+  private static void writeSolutionToFile(
+      Solution solution,
+      int numberOfDeliverers,
+      int numberOfReceivers,
+      IntVar[] routesTransports,
+      IntVar goalFunction)
+      throws IOException {
+    List<String> lines = new ArrayList<>();
+    int iterator = 0;
+    for (int i = 0; i < numberOfDeliverers; i++) {
+      for (int j = 0; j < numberOfReceivers; j++) {
+        lines.add(
+            String.format(
+                "Dostawca[%d] - Odbiorca[%d]: %d",
+                i, j, solution.getIntVal(routesTransports[iterator])));
+        iterator++;
+      }
+    }
+    lines.add(String.format("Zysk = %d", solution.getIntVal(goalFunction)));
+    Path out = Paths.get("solution.txt");
+    Files.write(out, lines, Charset.defaultCharset());
   }
 }
