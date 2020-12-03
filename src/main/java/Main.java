@@ -14,14 +14,19 @@ public class Main {
     int numberOfReceivers = 3;
     int numberOfDeliverers = 2;
     int blockedReceiver = 1;
+    int[][] transportCosts = new int[][] {{4, 7, 2}, {8, 10, 4}};
+    int fakeRouteIndex = -1;
+    List<Integer> unitCosts = new ArrayList<>();
+    List<Integer> routesMaxTransports = new ArrayList<>();
 
+    //    CREATE RECEIVERS AND DELIVERS
     receivers.add(new Participant(16, 18, true));
     receivers.add(new Participant(12, 16, true));
     receivers.add(new Participant(24, 15, true));
 
     deliverers.add(new Participant(20, 7, true));
     deliverers.add(new Participant(40, 8, true));
-
+    // ADD FAKE RECEIVER AND DELIVER IF NEEDED
     if (getSumOfValues(receivers) != getSumOfValues(deliverers)) {
       int deliversSum = getSumOfValues(deliverers);
       int receiversSum = getSumOfValues(receivers);
@@ -30,11 +35,9 @@ public class Main {
       deliverers.add(new Participant(receiversSum, 0, false));
       numberOfDeliverers += 1;
     }
-    int[][] transportCosts = new int[][] {{4, 7, 2}, {8, 10, 4}};
+
     int nRouts = numberOfDeliverers * numberOfReceivers;
-    List<Integer> unitCosts = new ArrayList<>();
-    List<Integer> routesMaxTransports = new ArrayList<>();
-    int fakeRoute = -1;
+    //    CALCULATE ROUTE MAX TRANSPORTS AND UNIT COSTS
     for (int i = 0; i < numberOfDeliverers; i++) {
       for (int j = 0; j < numberOfReceivers; j++) {
         int cost;
@@ -44,58 +47,69 @@ public class Main {
           cost = receivers.get(j).getCost() - deliverers.get(i).getCost() - transportCosts[i][j];
         }
         if (!deliverers.get(i).isReal() && j == blockedReceiver) {
-          fakeRoute = routesMaxTransports.size();
+          fakeRouteIndex = routesMaxTransports.size();
         }
         routesMaxTransports.add(
             Math.min(deliverers.get(i).getValue(), receivers.get(j).getValue()));
         unitCosts.add(cost);
       }
     }
-    IntVar[] transports =
+    //    DECLARE ROUTES TRANSPORTS VARIABLES
+    IntVar[] routesTransports =
         IntStream.range(0, nRouts)
             .mapToObj(i -> model.intVar("route: " + i, 0, routesMaxTransports.get(i)))
             .toArray(IntVar[]::new);
-    IntVar f_goal = model.intVar("f_goal", 0, IntVar.MAX_INT_BOUND);
-    //     Rows constraints
+    //    DECLARE GOAL FUNCTION VARIABLE
+    IntVar goalFunction = model.intVar("goalFunction", 0, IntVar.MAX_INT_BOUND);
+    //     ADD CONSTRAINTS FOR ROWS
     int iteratorOverColumns = 0;
     for (int i = 0; i < numberOfDeliverers; i++) {
       model
           .sum(
               java.util.Arrays.stream(
-                      transports, iteratorOverColumns, iteratorOverColumns + numberOfReceivers)
+                      routesTransports,
+                      iteratorOverColumns,
+                      iteratorOverColumns + numberOfReceivers)
                   .toArray(IntVar[]::new),
               "<=",
               deliverers.get(i).getValue())
           .post();
       iteratorOverColumns += numberOfReceivers;
     }
+    //     ADD CONSTRAINTS FOR COLUMNS
     for (int i = 0; i < numberOfReceivers; i++) {
       int it = i;
       List<IntVar> columnConstraints = new ArrayList<>();
       for (int j = 0; j < numberOfDeliverers; j++) {
-        columnConstraints.add(transports[it]);
+        columnConstraints.add(routesTransports[it]);
         it += numberOfReceivers;
       }
       model.sum(columnConstraints.toArray(IntVar[]::new), "<=", receivers.get(i).getValue()).post();
     }
-    if (fakeRoute != -1) {
-      model.arithm(transports[fakeRoute], "=", 0).post();
-    }
 
+    //    ADD CONSTRAINTS FOR BLOCKING ROUTE
+    if (fakeRouteIndex != -1) {
+      model.arithm(routesTransports[fakeRouteIndex], "=", 0).post();
+    }
     List<IntVar> blockedRoutes = new ArrayList<>();
-    int bIter = blockedReceiver;
+    int bIterator = blockedReceiver;
     for (int i = 0; i < numberOfDeliverers - 1; i++) {
-      blockedRoutes.add(transports[bIter]);
-      bIter += numberOfReceivers;
+      blockedRoutes.add(routesTransports[bIterator]);
+      bIterator += numberOfReceivers;
     }
     model
         .sum(blockedRoutes.toArray(IntVar[]::new), "=", receivers.get(blockedReceiver).getValue())
         .post();
-    model.sum(transports, "=", getSumOfValues(receivers)).post();
-    model.scalar(transports, unitCosts.stream().mapToInt(i -> i).toArray(), "=", f_goal).post();
+    // ADD CONSTRAINT FOR ENSURE FULL DEMAND
+    model.sum(routesTransports, "=", getSumOfValues(receivers)).post();
+    //    COMPUTE GOAL FUNCTION
+    model
+        .scalar(routesTransports, unitCosts.stream().mapToInt(i -> i).toArray(), "=", goalFunction)
+        .post();
+    //    SOLVE MODEL
     Solver solver = model.getSolver();
-    //
-    Solution solution = solver.findOptimalSolution(f_goal, true);
+    Solution solution = solver.findOptimalSolution(goalFunction, true);
+    //    WRITE SOLUTION TO FILE
     System.out.println(solution.toString());
   }
 
